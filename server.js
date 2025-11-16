@@ -1,12 +1,14 @@
 const express = require('express');
 const app= express();
 require('dotenv').config();
+const cors= require('cors');
 
 const EntertainmentRoute=require('./Routers/Entertainment');
 
 
 // Middleware layer
 app.use(express.json());
+app.use(cors())
 app.use("/entertainment",EntertainmentRoute);
 
 
