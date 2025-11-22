@@ -1,13 +1,19 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/Homepage';
-import Entertainment from './pages/Entertainment';
+
+import ArticlePage from './components/Article';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/entertainment" element={<Entertainment />} />
+
+       
+        
+
+        {/* Article route */}
+        <Route path="/:section/:id" element={<ArticlePage />} />
       </Routes>
     </Router>
   );
