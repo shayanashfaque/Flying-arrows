@@ -4,18 +4,12 @@ require('dotenv').config();
 const cors = require('cors');
 
 const ArticlesRoute = require("./Routers/Articles");
-const TrendingRoute = require("./Routers/Trending");
-const LatestRoute = require("./Routers/Latest");
 
 
 app.use(cors());
 app.use(express.json());  
-app.use("/api/articles/trending",TrendingRoute);
-app.use("/api/articles/latest",LatestRoute);
+
 app.use("/api/articles", ArticlesRoute);
-
-
-
 
 
 

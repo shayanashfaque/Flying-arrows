@@ -13,7 +13,7 @@ function App() {
         
 
         {/* Article route */}
-        <Route path="/:section/:id" element={<ArticlePage />} />
+        <Route path="/:section/:id/:slug" element={<ArticlePage />} />
       </Routes>
     </Router>
   );

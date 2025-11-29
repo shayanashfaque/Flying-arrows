@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 import '../App.css';
@@ -8,10 +8,16 @@ const HomePage = () => {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [articles, setArticles] = useState([]);
+
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("latest");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   const navigate = useNavigate();
 
+  // Category list
   const categories = [
     'All',
     'News',
@@ -23,70 +29,96 @@ const HomePage = () => {
     'Horoscope',
   ];
 
+  // Auto-highlight active category pill while scrolling
+  const categoryRefs = useRef({});
+
+  useEffect(() => {
+    const handleScroll = () => {
+      let closest = 'All';
+      let minDistance = Infinity;
+
+      Object.entries(categoryRefs.current).forEach(([cat, ref]) => {
+        if (!ref) return;
+        const rect = ref.getBoundingClientRect();
+        const dist = Math.abs(rect.top);
+        if (dist < minDistance) {
+          closest = cat;
+          minDistance = dist;
+        }
+      });
+
+      setSelectedCategory(closest);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch articles whenever debouncedQuery OR selectedCategory changes
+  // Fetch Articles (pagination + search + category + sorting)
   useEffect(() => {
     const fetchArticles = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        let endpoint;
+        let endpoint = "";
+        const limit = 12;
 
-        // Search with optional category
         if (debouncedQuery.trim()) {
-          // Trending & Latest have separate endpoints
-          if (selectedCategory === 'Trending') {
-            endpoint = `/api/articles/trending/search?q=${encodeURIComponent(
-              debouncedQuery
-            )}`;
-          } else if (selectedCategory === 'Latest') {
-            endpoint = `/api/articles/latest/search?q=${encodeURIComponent(
-              debouncedQuery
-            )}`;
-          } else {
-            const categoryParam =
-              selectedCategory === 'All'
-                ? ''
-                : `&category=${selectedCategory.toLowerCase()}`;
-            endpoint = `/api/articles/search?q=${encodeURIComponent(
-              debouncedQuery
-            )}${categoryParam}`;
-          }
+          // Search endpoint
+          let scope = "all";
+          if (selectedCategory === "Trending") scope = "trending";
+          if (selectedCategory === "Latest") scope = "latest";
+
+          const categoryParam =
+            selectedCategory !== "All" &&
+            selectedCategory !== "Trending" &&
+            selectedCategory !== "Latest"
+              ? `&category=${selectedCategory.toLowerCase()}`
+              : "";
+          
+          endpoint = `/api/articles/search?q=${encodeURIComponent(
+            debouncedQuery
+          )}&scope=${scope}${categoryParam}`;
         } else {
-          // No search query: fetch by section
-          if (selectedCategory === 'Trending') {
+          // Category-based endpoint
+          if (selectedCategory === "Trending") {
             endpoint = `/api/articles/trending`;
-          } else if (selectedCategory === 'Latest') {
-            endpoint = `/api/articles/latest`;
+          } else if (selectedCategory === "Latest") {
+            endpoint = `/api/articles/latest?page=${page}&limit=${limit}&sort=${sort}`;
           } else {
-            const section = selectedCategory === 'All' ? 'all' : selectedCategory.toLowerCase();
-            endpoint = `/api/articles/${section}`;
+            const section = selectedCategory === "All" ? "all" : selectedCategory.toLowerCase();
+            endpoint = `/api/articles/${section}?page=${page}&limit=${limit}&sort=${sort}`;
           }
         }
 
         const res = await api.get(endpoint);
+
         setArticles(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
-        console.error('Error fetching articles:', err.response?.data || err.message);
-        setError('Failed to fetch articles.');
+        console.error(err);
+        setError("Failed to fetch articles");
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticles();
-  }, [debouncedQuery, selectedCategory]);
+  }, [debouncedQuery, selectedCategory, page, sort]);
 
-  // Trigger search immediately (button or Enter key)
   const handleSearch = () => {
     setDebouncedQuery(searchQuery);
+    setPage(1);
   };
+
+  const goToNextPage = () => setPage((p) => p + 1);
+  const goToPreviousPage = () => setPage((p) => Math.max(1, p - 1));
 
   return (
     <div className="homepage">
@@ -100,12 +132,9 @@ const HomePage = () => {
             placeholder="Search for absurd headlines..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            aria-label="Search articles"
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
-          <button onClick={handleSearch} aria-label="Submit search">
-            Search
-          </button>
+          <button onClick={handleSearch}>Search</button>
         </div>
       </header>
 
@@ -113,20 +142,37 @@ const HomePage = () => {
         {categories.map((category) => (
           <button
             key={category}
-            className={`category-button ${selectedCategory === category ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(category)}
-            aria-label={`Filter by ${category}`}
+            ref={(el) => (categoryRefs.current[category] = el)}
+            className={`category-button ${
+              selectedCategory === category ? "active" : ""
+            }`}
+            onClick={() => {
+              setSelectedCategory(category);
+              setPage(1);
+            }}
           >
             {category}
           </button>
         ))}
       </nav>
 
+      {/* Sorting */}
+      <div className="sorting-controls">
+        <label>Sort:</label>
+        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="latest">Latest</option>
+          <option value="oldest">Oldest</option>
+          <option value="views">Most Viewed</option>
+          <option value="az">A → Z</option>
+          <option value="za">Z → A</option>
+        </select>
+      </div>
+
       <main className="main-content">
         {loading ? (
           <p>Loading articles...</p>
         ) : error ? (
-          <p style={{ color: 'red' }}>{error}</p>
+          <p style={{ color: "red" }}>{error}</p>
         ) : articles.length === 0 ? (
           <p>No articles found.</p>
         ) : (
@@ -135,45 +181,36 @@ const HomePage = () => {
               <article
                 key={article.id}
                 className="article-card"
-                style={{ cursor: 'pointer' }}
                 onClick={() =>
                   navigate(
-                    `/${article.section_name?.toLowerCase() || 'general'}/${article.id}`
-                  )
-                }
-                tabIndex={0}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' &&
-                  navigate(
-                    `/${article.section_name?.toLowerCase() || 'general'}/${article.id}`
+                    `/${article.section_name?.toLowerCase()}/${article.id}/${article.slug}`
                   )
                 }
               >
                 {article.image && (
                   <img
                     src={
-                      article.image.startsWith('http')
+                      article.image.startsWith("http")
                         ? article.image
                         : `/images/${article.image}`
                     }
-                    alt={article.title || 'Article'}
+                    alt={article.title}
                     loading="lazy"
                   />
                 )}
 
                 <div className="article-content">
-                  <h2>{article.title || 'Untitled Article'}</h2>
-                  <p>{article.content?.slice(0, 120) || 'No content available.'}...</p>
+                  <h2>{article.title}</h2>
+                  <p>{article.content?.slice(0, 120)}...</p>
 
                   <div className="article-meta">
-                    <span className="date">
-                      {article.published_at
-                        ? new Date(article.published_at).toLocaleDateString()
-                        : 'Unknown date'}
+                    <span>
+                      {new Date(article.published_at).toLocaleDateString()}
                     </span>
-                    <span className="views">👁️ {article.views ?? 0}</span>
-                    <span className="category-tag">{article.section_name || 'General'}</span>
-                    {article.author_name && <span className="author">{article.author_name}</span>}
+                    <span>👁️ {article.views}</span>
+                    <span className="category-tag">
+                      {article.section_name}
+                    </span>
                   </div>
                 </div>
               </article>
@@ -182,8 +219,17 @@ const HomePage = () => {
         )}
       </main>
 
+      {/* Pagination */}
+      <div className="pagination">
+        <button disabled={page === 1} onClick={goToPreviousPage}>
+          Previous
+        </button>
+        <span>Page {page}</span>
+        <button onClick={goToNextPage}>Next</button>
+      </div>
+
       <footer className="footer">
-        <p>&copy; 2026 The Flying Arrow. All rights reserved. Satire is our middle name.</p>
+        <p>&copy; 2026 The Flying Arrow. All rights reserved.</p>
       </footer>
     </div>
   );
