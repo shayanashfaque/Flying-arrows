@@ -15,6 +15,8 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Added for login status
+
   const navigate = useNavigate();
 
   // Category list
@@ -32,7 +34,7 @@ const HomePage = () => {
   // Auto-highlight active category pill while scrolling
   const categoryRefs = useRef({});
 
-  useEffect(() => {
+ /* useEffect(() => {
     const handleScroll = () => {
       let closest = 'All';
       let minDistance = Infinity;
@@ -52,6 +54,12 @@ const HomePage = () => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);*/
+
+  // Detect login on load (added)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) setIsLoggedIn(true);
   }, []);
 
   // Debounce search input
@@ -120,10 +128,24 @@ const HomePage = () => {
   const goToNextPage = () => setPage((p) => p + 1);
   const goToPreviousPage = () => setPage((p) => Math.max(1, p - 1));
 
+  // Logout handler (added)
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("author");
+    setIsLoggedIn(false);
+    navigate("/");
+  };
+
   return (
     <div className="homepage">
       <header className="header">
-        <h1>The Flying Arrow</h1>
+        <div className="header-top">
+          <div className="title-container">
+            <img src="/Logo.png" alt="The Flying Arrow Logo" className="logo" />
+            <h1>The Flying Arrow</h1>
+          </div>
+          <button onClick={() => window.location.href = "/auth/X74b8Ajk8301"} className="test-login-btn">Test Login</button>
+        </div>
         <p>World's Finest News Source</p>
 
         <div className="search-bar">
@@ -136,6 +158,13 @@ const HomePage = () => {
           />
           <button onClick={handleSearch}>Search</button>
         </div>
+
+        {/* Show logout only when logged in (added) */}
+        {isLoggedIn && (
+          <button className="logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        )}
       </header>
 
       <nav className="categories">
